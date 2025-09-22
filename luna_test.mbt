@@ -139,3 +139,101 @@ test "random_generation" {
   let val = arr.get([0, 0])
   inspect(val >= 0.0 && val < 1.0, content="true")
 }
+
+///|
+test "negative_indexing" {
+  let a = from_array([1.0, 2.0, 3.0, 4.0, 5.0, 6.0], [2, 3])
+  // Test negative indices
+  inspect(a.get([-1, -1]), content="6")  // Last element
+  inspect(a.get([-2, -3]), content="1")  // First element
+  inspect(a.get([0, -1]), content="3")   // Last column of first row
+}
+
+///|
+test "slicing_operations" {
+  let a = from_array([1.0, 2.0, 3.0, 4.0, 5.0, 6.0], [2, 3])
+  // Test basic slicing
+  let slice1 = a.slice_array([slice(Some(0), Some(1)), slice(Some(1), Some(3))])
+  inspect(slice1.shape(), content="[1, 2]")
+  inspect(slice1.get([0, 0]), content="2")
+  inspect(slice1.get([0, 1]), content="3")
+}
+
+///|
+test "fancy_indexing" {
+  let a = from_array([1.0, 2.0, 3.0, 4.0], [2, 2])
+  // Test fancy indexing
+  let indices = [[0, 1], [1, 0]]  // Select elements at (0,1) and (1,0)
+  let result = a.fancy_index(indices)
+  inspect(result.shape(), content="[2]")
+  inspect(result.get([0]), content="2")  // a[0,1]
+  inspect(result.get([1]), content="3")  // a[1,0]
+}
+
+///|
+test "boolean_indexing" {
+  let a = from_array([1.0, 2.0, 3.0, 4.0], [4])
+  let mask = from_array([true, false, true, false], [4])  // Select 1st and 3rd elements
+  let result = a.boolean_index(mask)
+  inspect(result.shape(), content="[2]")
+  inspect(result.get([0]), content="1")
+  inspect(result.get([1]), content="3")
+}
+
+///|
+test "broadcasting_operations" {
+  // Test broadcasting with different shapes
+  let a = from_array([1.0, 2.0, 3.0, 4.0], [2, 2])  // 2x2 array
+  let b = from_array([10.0, 20.0], [2, 1])           // 2x1 array (should broadcast)
+
+  let result = add(a, b)
+  inspect(result.shape(), content="[2, 2]")
+  inspect(result.get([0, 0]), content="11")  // 1 + 10
+  inspect(result.get([0, 1]), content="12")  // 2 + 10
+  inspect(result.get([1, 0]), content="23")  // 3 + 20
+  inspect(result.get([1, 1]), content="24")  // 4 + 20
+}
+
+///|
+test "arrow_integration" {
+  // Test Arrow-compatible data structures
+  let arr1 = from_array([1.0, 2.0, 3.0], [3])
+  let arr2 = from_array([4.0, 5.0, 6.0], [3])
+
+  let table = create_arrow_table([arr1, arr2], ["col1", "col2"])
+  inspect(table.num_rows, content="3")
+  inspect(table.columns.length(), content="2")
+
+  // Test column selection
+  match get_column(table, "col1") {
+    Some(col) => inspect(col.name, content="col1")
+    None => inspect(false, content="true")  // Should not happen
+  }
+}
+
+///|
+test "vectorized_operations" {
+  let a = from_array([1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0], [8])
+  let b = from_array([2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0], [8])
+
+  // Test vectorized addition
+  let result = add_vectorized(a, b)
+  inspect(result.get([0]), content="3")
+  inspect(result.get([7]), content="10")
+
+  // Test vectorized sum
+  let sum_result = sum_vectorized(a)
+  inspect(sum_result, content="36")  // 1+2+3+4+5+6+7+8 = 36
+}
+
+///|
+test "fma_operation" {
+  let a = from_array([1.0, 2.0], [2])
+  let b = from_array([3.0, 4.0], [2])
+  let c = from_array([5.0, 6.0], [2])
+
+  // Test fused multiply-add: a * b + c
+  let result = fma_vectorized(a, b, c)
+  inspect(result.get([0]), content="8")   // 1*3 + 5 = 8
+  inspect(result.get([1]), content="14")  // 2*4 + 6 = 14
+}
